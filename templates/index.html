@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EyeNova • Clinical AI Decision Support</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+</head>
+<body>
+  <div class="shell">
+    <div class="hero">
+      <h1>EyeNova</h1>
+      <p>Clinical AI decision support for keratoconus triage, combining multimodal topography and structured ocular parameters into a single diagnostic view.</p>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <h2 style="margin-top:0">Clinical Input Form</h2>
+        <form action="/predict" method="post" enctype="multipart/form-data">
+          <div class="row">
+            <div class="field">
+              <label for="age">Age (years)</label>
+              <input id="age" name="age" type="number" min="1" max="120" step="1" required />
+            </div>
+            <div class="field">
+              <label for="gender">Gender</label>
+              <select id="gender" name="gender" required>
+                <option value="">Select</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label for="astigmatism_value">Astigmatism Value (D)</label>
+              <input id="astigmatism_value" name="astigmatism_value" type="number" step="0.01" required />
+            </div>
+            <div class="field">
+              <label for="astigmatism_axis">Astigmatism Axis (°)</label>
+              <input id="astigmatism_axis" name="astigmatism_axis" type="number" min="0" max="180" step="1" required />
+            </div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label for="pachy_x">Pachymetry Thinnest X Coordinate</label>
+              <input id="pachy_x" name="pachy_x" type="number" step="0.01" required />
+            </div>
+            <div class="field">
+              <label for="pachy_y">Pachymetry Thinnest Y Coordinate</label>
+              <input id="pachy_y" name="pachy_y" type="number" step="0.01" required />
+            </div>
+          </div>
+          <div class="field">
+            <div class="upload-label-row">
+              <label class="upload-heading">Topography Grid Upload</label>
+              <span class="upload-note">Upload exactly 4 maps</span>
+            </div>
+            <div class="upload-grid">
+              <div class="upload-card" onclick="triggerFileInput('anterior_map')">
+                <label for="anterior_map">Anterior Map</label>
+                <input id="anterior_map" name="anterior_map" type="file" accept="image/*" required onchange="showPreview(this,'anterior_preview')" />
+                <div class="preview" id="anterior_preview"><div class="placeholder">Tap to upload Anterior map</div></div>
+                <small class="hint">Tap anywhere on this card to choose the image.</small>
+              </div>
+              <div class="upload-card" onclick="triggerFileInput('axial_map')">
+                <label for="axial_map">Axial Map</label>
+                <input id="axial_map" name="axial_map" type="file" accept="image/*" required onchange="showPreview(this,'axial_preview')" />
+                <div class="preview" id="axial_preview"><div class="placeholder">Tap to upload Axial map</div></div>
+                <small class="hint">Tap anywhere on this card to choose the image.</small>
+              </div>
+              <div class="upload-card" onclick="triggerFileInput('pachymetry_map')">
+                <label for="pachymetry_map">Pachymetry Map</label>
+                <input id="pachymetry_map" name="pachymetry_map" type="file" accept="image/*" required onchange="showPreview(this,'pachymetry_preview')" />
+                <div class="preview" id="pachymetry_preview"><div class="placeholder">Tap to upload Pachymetry map</div></div>
+                <small class="hint">Tap anywhere on this card to choose the image.</small>
+              </div>
+              <div class="upload-card" onclick="triggerFileInput('posterior_map')">
+                <label for="posterior_map">Posterior Map</label>
+                <input id="posterior_map" name="posterior_map" type="file" accept="image/*" required onchange="showPreview(this,'posterior_preview')" />
+                <div class="preview" id="posterior_preview"><div class="placeholder">Tap to upload Posterior map</div></div>
+                <small class="hint">Tap anywhere on this card to choose the image.</small>
+              </div>
+            </div>
+          </div>
+          <button class="btn" type="submit">Run Clinical Assessment</button>
+        </form>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">Clinical Guidelines</h3>
+        <ul>
+          <li>Use this interface as a decision-support overlay rather than a sole diagnostic authority.</li>
+          <li>Ensure all four corneal maps are supplied as distinct, high-quality images.</li>
+          <li>Review the Grad-CAM overlay for structural regions that most strongly influenced the outcome.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <script>
+    function triggerFileInput(inputId) {
+      const input = document.getElementById(inputId);
+      if (input) input.click();
+    }
+
+    function showPreview(input, targetId) {
+      const preview = document.getElementById(targetId);
+      if (!preview) return;
+      if (!input.files || !input.files[0]) {
+        preview.innerHTML = '<div class="placeholder">No image selected</div>';
+        return;
+      }
+      const file = input.files[0];
+      const reader = new FileReader();
+      reader.onload = function (event) {
+        preview.innerHTML = '<img src="' + event.target.result + '" alt="Uploaded preview" />';
+      };
+      reader.readAsDataURL(file);
+    }
+  </script>
+</body>
+</html>

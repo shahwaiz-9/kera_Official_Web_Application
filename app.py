@@ -8,7 +8,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from flask import Flask, render_template_string, request
+from flask import Flask, render_template, render_template_string, request
 from PIL import Image, ImageOps
 from transformers import ViTImageProcessor, ViTModel
 
@@ -178,7 +178,7 @@ class EyeNovaApp:
             base = Image.blend(base, color_overlay, alpha=0.35)
             buffer = io.BytesIO()
             base.save(buffer, format='PNG')
-            heatmap_b64 = base64.b64encode(buffer.getvalue()).decode('ascii')
+        heatmap_b64 = base64.b64encode(buffer.getvalue()).decode('ascii')
 
         return label, confidence, heatmap_b64
 
@@ -186,212 +186,9 @@ class EyeNovaApp:
 engine = EyeNovaApp()
 
 
-HTML_FORM = """
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>EyeNova • Clinical AI Decision Support</title>
-  <style>
-    :root { --bg:#f4f7fb; --panel:#ffffff; --ink:#10324a; --muted:#617688; --accent:#1f5d8a; --accent2:#0b6ea8; --line:#dbe4ee; }
-    * { box-sizing:border-box; }
-    body { margin:0; font-family:Inter,Segoe UI,Roboto,Arial,sans-serif; background:linear-gradient(135deg,#eef4fb,#f7fbff); color:var(--ink); }
-    .shell { max-width:1180px; margin:0 auto; padding:28px; }
-    .hero { background:linear-gradient(120deg,#0f2f44,#1a4e70); color:white; border-radius:24px; padding:28px 32px; box-shadow:0 20px 45px rgba(15,47,68,.16); }
-    .hero h1 { margin:0 0 8px; font-size:2rem; }
-    .hero p { margin:0; color:#dce9f3; max-width:700px; line-height:1.6; }
-    .grid { display:grid; grid-template-columns:1.2fr .8fr; gap:24px; margin-top:24px; }
-    .card { background:var(--panel); border:1px solid var(--line); border-radius:22px; padding:24px; box-shadow:0 12px 30px rgba(16,50,74,0.06); }
-    label { display:block; font-weight:600; margin-bottom:8px; color:var(--ink); }
-    input, select, button { width:100%; border-radius:12px; border:1px solid var(--line); padding:12px 14px; font-size:15px; }
-    input:focus, select:focus { outline:2px solid rgba(31,93,138,.2); border-color:var(--accent); }
-    .row { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-bottom:14px; }
-    .field { margin-bottom:14px; }
-    .upload-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
-    .upload-card { border:1px dashed var(--line); border-radius:14px; padding:12px; background:#fbfdff; }
-    .upload-card small { display:block; color:var(--muted); margin-top:6px; }
-    .preview { margin-top:10px; min-height:90px; display:flex; align-items:center; justify-content:center; border-radius:10px; border:1px solid var(--line); background:white; overflow:hidden; }
-    .preview img { max-width:100%; max-height:140px; object-fit:cover; display:block; }
-    .preview .placeholder { color:var(--muted); font-size:13px; text-align:center; padding:10px; }
-    .btn { background:linear-gradient(135deg,var(--accent),var(--accent2)); color:white; border:none; cursor:pointer; font-weight:700; transition:transform .15s ease; }
-    .btn:hover { transform:translateY(-1px); }
-    .btn.secondary { background:white; color:var(--accent); border:1px solid var(--line); }
-    .result-shell { display:grid; gap:20px; }
-    .metric { display:flex; justify-content:space-between; padding:12px 14px; background:#f7fbff; border-radius:12px; border:1px solid var(--line); }
-    .heatmap { border-radius:18px; border:1px solid var(--line); background:#f9fcff; padding:14px; }
-    .heatmap img { width:100%; border-radius:12px; display:block; }
-    .status-badge { display:inline-block; padding:8px 12px; border-radius:999px; font-weight:700; background:#e7f4ff; color:var(--accent); }
-    @media (max-width:900px){ .grid,.upload-grid,.row{grid-template-columns:1fr;} }
-  </style>
-</head>
-<body>
-  <div class="shell">
-    <div class="hero">
-      <h1>EyeNova</h1>
-      <p>Clinical AI decision support for keratoconus triage, combining multimodal topography and structured ocular parameters into a single diagnostic view.</p>
-    </div>
-    <div class="grid">
-      <div class="card">
-        <h2 style="margin-top:0">Clinical Input Form</h2>
-        <form action="/predict" method="post" enctype="multipart/form-data">
-          <div class="row">
-            <div class="field">
-              <label for="age">Age (years)</label>
-              <input id="age" name="age" type="number" min="1" max="120" step="1" required />
-            </div>
-            <div class="field">
-              <label for="gender">Gender</label>
-              <select id="gender" name="gender" required>
-                <option value="">Select</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-              </select>
-            </div>
-          </div>
-          <div class="row">
-            <div class="field">
-              <label for="astigmatism_value">Astigmatism Value (D)</label>
-              <input id="astigmatism_value" name="astigmatism_value" type="number" step="0.01" required />
-            </div>
-            <div class="field">
-              <label for="astigmatism_axis">Astigmatism Axis (°)</label>
-              <input id="astigmatism_axis" name="astigmatism_axis" type="number" min="0" max="180" step="1" required />
-            </div>
-          </div>
-          <div class="row">
-            <div class="field">
-              <label for="pachy_x">Pachymetry Thinnest X Coordinate</label>
-              <input id="pachy_x" name="pachy_x" type="number" step="0.01" required />
-            </div>
-            <div class="field">
-              <label for="pachy_y">Pachymetry Thinnest Y Coordinate</label>
-              <input id="pachy_y" name="pachy_y" type="number" step="0.01" required />
-            </div>
-          </div>
-          <div class="field">
-            <label>Topography Grid Upload</label>
-            <div class="upload-grid">
-              <div class="upload-card">
-                <label for="anterior_map">Anterior Map</label>
-                <input id="anterior_map" name="anterior_map" type="file" accept="image/*" required onchange="showPreview(this,'anterior_preview')" />
-                <small>High-resolution anterior map</small>
-                <div id="anterior_preview" class="preview"><div class="placeholder">No image selected</div></div>
-              </div>
-              <div class="upload-card">
-                <label for="axial_map">Axial Map</label>
-                <input id="axial_map" name="axial_map" type="file" accept="image/*" required onchange="showPreview(this,'axial_preview')" />
-                <small>Axial curvature map</small>
-                <div id="axial_preview" class="preview"><div class="placeholder">No image selected</div></div>
-              </div>
-              <div class="upload-card">
-                <label for="pachymetry_map">Pachymetry Map</label>
-                <input id="pachymetry_map" name="pachymetry_map" type="file" accept="image/*" required onchange="showPreview(this,'pachymetry_preview')" />
-                <small>Corneal thickness map</small>
-                <div id="pachymetry_preview" class="preview"><div class="placeholder">No image selected</div></div>
-              </div>
-              <div class="upload-card">
-                <label for="posterior_map">Posterior Map</label>
-                <input id="posterior_map" name="posterior_map" type="file" accept="image/*" required onchange="showPreview(this,'posterior_preview')" />
-                <small>Posterior elevation map</small>
-                <div id="posterior_preview" class="preview"><div class="placeholder">No image selected</div></div>
-              </div>
-            </div>
-          </div>
-          <button class="btn" type="submit">Run Clinical Assessment</button>
-        </form>
-      </div>
-      <div class="card">
-        <h3 style="margin-top:0">Clinical Guidelines</h3>
-        <ul>
-          <li>Use this interface as a decision-support overlay rather than a sole diagnostic authority.</li>
-          <li>Ensure all four corneal maps are supplied as distinct, high-quality images.</li>
-          <li>Review the Grad-CAM overlay for structural regions that most strongly influenced the outcome.</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-  <script>
-    function showPreview(input, targetId) {
-      const preview = document.getElementById(targetId);
-      if (!preview) return;
-      if (!input.files || !input.files[0]) {
-        preview.innerHTML = '<div class="placeholder">No image selected</div>';
-        return;
-      }
-      const file = input.files[0];
-      const reader = new FileReader();
-      reader.onload = function (event) {
-        preview.innerHTML = '<img src="' + event.target.result + '" alt="Uploaded preview" />';
-      };
-      reader.readAsDataURL(file);
-    }
-  </script>
-</body>
-</html>
-"""
-
-
-RESULT_TEMPLATE = """
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>EyeNova • Diagnostic Result</title>
-  <style>
-    :root { --bg:#f4f7fb; --panel:#ffffff; --ink:#10324a; --muted:#617688; --accent:#1f5d8a; --accent2:#0b6ea8; --line:#dbe4ee; }
-    * { box-sizing:border-box; }
-    body { margin:0; font-family:Inter,Segoe UI,Roboto,Arial,sans-serif; background:linear-gradient(135deg,#eef4fb,#f7fbff); color:var(--ink); }
-    .shell { max-width:1180px; margin:0 auto; padding:28px; }
-    .card { background:var(--panel); border:1px solid var(--line); border-radius:24px; padding:24px; box-shadow:0 12px 30px rgba(16,50,74,0.06); }
-    .header { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:18px; }
-    .status { display:inline-block; padding:8px 12px; border-radius:999px; font-weight:700; background:#e7f4ff; color:var(--accent); }
-    .metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin:16px 0 22px; }
-    .metric { padding:14px; border-radius:14px; background:#f8fbff; border:1px solid var(--line); }
-    .layout { display:grid; grid-template-columns:1.1fr .9fr; gap:22px; align-items:start; }
-    .heatmap { border-radius:18px; border:1px solid var(--line); padding:14px; background:#fbfdff; }
-    .heatmap img { width:100%; display:block; border-radius:12px; }
-    .btn { width:auto; display:inline-block; text-decoration:none; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:white; padding:12px 18px; border-radius:12px; font-weight:700; }
-    @media (max-width:900px){ .layout,.metrics{grid-template-columns:1fr;} }
-  </style>
-</head>
-<body>
-  <div class="shell">
-    <div class="card">
-      <div class="header">
-        <div>
-          <h1 style="margin:0 0 6px">Diagnostic Result</h1>
-          <p style="margin:0;color:var(--muted)">EyeNova multimodal assessment generated from the uploaded corneal maps and clinical inputs.</p>
-        </div>
-        <a class="btn" href="/">Reset / New Scan</a>
-      </div>
-      <div class="status">Status: {{ status }}</div>
-      <div class="metrics">
-        <div class="metric"><strong>Confidence</strong><div>{{ confidence }}%</div></div>
-        <div class="metric"><strong>Model</strong><div>ViT + Clinical Fusion</div></div>
-      </div>
-      <div class="layout">
-        <div class="heatmap">
-          <h3 style="margin-top:0">Grad-CAM Interpretability</h3>
-          <img src="data:image/png;base64,{{ heatmap_b64 }}" alt="Grad-CAM heatmap" />
-        </div>
-        <div class="card" style="padding:18px">
-          <h3 style="margin-top:0">Clinical Interpretation</h3>
-          <p>The overlay highlights regions of the stitched topography view that were most influential in the model's prediction. A stronger signal in the central and paracentral corneal regions may be consistent with keratoconic morphology.</p>
-          <p style="color:var(--muted)">This output is intended to support clinician review and should be interpreted alongside standard clinical examination and tomography findings.</p>
-        </div>
-      </div>
-    </div>
-  </div>
-</body>
-</html>
-"""
-
-
 @app.get('/')
 def index():
-    return render_template_string(HTML_FORM)
+    return render_template('index.html')
 
 
 @app.post('/predict')
@@ -424,7 +221,7 @@ def predict():
             'pachy_y': payload['pachy_y'],
         }
         status, confidence, heatmap_b64 = engine.infer(payload, image_files)
-        return render_template_string(RESULT_TEMPLATE, status=status, confidence=f'{confidence:.1f}', heatmap_b64=heatmap_b64)
+        return render_template('result.html', status=status, confidence=f'{confidence:.1f}', heatmap_b64=heatmap_b64)
     except Exception as exc:
         return render_template_string("<h2>Assessment Error</h2><p>{{ error }}</p><a href='/'>Return</a>", error=str(exc))
 

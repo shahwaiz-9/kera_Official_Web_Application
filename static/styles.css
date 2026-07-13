@@ -1,0 +1,44 @@
+:root { --bg:#f4f7fb; --panel:#ffffff; --ink:#10324a; --muted:#617688; --accent:#1f5d8a; --accent2:#0b6ea8; --line:#dbe4ee; }
+* { box-sizing:border-box; }
+body { margin:0; font-family:Inter,Segoe UI,Roboto,Arial,sans-serif; background:linear-gradient(135deg,#eef4fb,#f7fbff); color:var(--ink); }
+.shell { max-width:1180px; margin:0 auto; padding:28px; }
+.hero { background:linear-gradient(120deg,#0f2f44,#1a4e70); color:white; border-radius:24px; padding:28px 32px; box-shadow:0 20px 45px rgba(15,47,68,.16); }
+.hero h1 { margin:0 0 8px; font-size:2rem; }
+.hero p { margin:0; color:#dce9f3; max-width:700px; line-height:1.6; }
+.grid { display:grid; grid-template-columns:1.2fr .8fr; gap:24px; margin-top:24px; }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:22px; padding:24px; box-shadow:0 12px 30px rgba(16,50,74,0.06); }
+.compact-card { padding:18px; }
+.header { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:18px; }
+.status { display:inline-block; padding:8px 12px; border-radius:999px; font-weight:700; background:#e7f4ff; color:var(--accent); }
+.metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin:16px 0 22px; }
+.metric { padding:14px; border-radius:14px; background:#f8fbff; border:1px solid var(--line); }
+.layout { display:grid; grid-template-columns:1.1fr .9fr; gap:22px; align-items:start; }
+.heatmap { border-radius:18px; border:1px solid var(--line); padding:14px; background:#fbfdff; }
+.heatmap img { width:100%; display:block; border-radius:12px; }
+.btn { width:auto; display:inline-block; text-decoration:none; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:white; padding:12px 18px; border-radius:12px; font-weight:700; }
+.btn:hover { transform:translateY(-1px); }
+label { display:block; font-weight:600; margin-bottom:8px; color:var(--ink); }
+input, select, button { width:100%; border-radius:12px; border:1px solid var(--line); padding:12px 14px; font-size:15px; }
+input:focus, select:focus { outline:2px solid rgba(31,93,138,.2); border-color:var(--accent); }
+.row { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-bottom:14px; }
+.field { margin-bottom:14px; }
+.upload-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.upload-card { position:relative; border:none; border-radius:24px; padding:18px; background:rgba(255,255,255,0.96); box-shadow:0 15px 40px rgba(16,50,74,0.06); transition:transform .2s ease, border-color .2s ease; cursor:pointer; }
+.upload-card:hover { transform:translateY(-2px); border-color:rgba(31,93,138,0.2); }
+.upload-card label { display:block; margin-bottom:12px; font-weight:700; color:var(--accent); }
+.upload-card input[type="file"] { display:none; }
+.upload-card .hint { display:block; color:var(--muted); margin-top:10px; line-height:1.5; font-size:0.95rem; }
+.preview { margin-top:16px; min-height:120px; display:flex; align-items:center; justify-content:center; border-radius:18px; border:1px solid rgba(31,93,138,0.12); background:#eef6fd; overflow:hidden; }
+.preview img { max-width:100%; max-height:160px; object-fit:cover; display:block; border-radius:14px; }
+.preview .placeholder { color:var(--muted); font-size:14px; text-align:center; padding:12px 10px; }
+.btn.secondary { background:white; color:var(--accent); border:1px solid var(--line); }
+.result-shell { display:grid; gap:20px; }
+.heatmap { border-radius:18px; border:1px solid var(--line); background:#f9fcff; padding:14px; }
+.status-badge { display:inline-block; padding:8px 12px; border-radius:999px; font-weight:700; background:#e7f4ff; color:var(--accent); }
+.page-title { margin:0 0 6px; }
+.subtitle { margin:0; color:var(--muted); }
+.section-heading { margin-top:0; }
+.upload-label-row { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:14px; }
+.upload-heading { margin:0; font-size:1rem; letter-spacing:.01em; }
+.upload-note { color:var(--muted); font-size:.95rem; }
+@media (max-width:900px){ .grid,.upload-grid,.row,.layout,.metrics{grid-template-columns:1fr;} }
