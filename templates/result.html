@@ -1,38 +1,123 @@
 <!doctype html>
 <html lang="en">
+
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>EyeNova • Diagnostic Result</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>EyeNova • Diagnostic Result</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
 </head>
+
 <body>
-  <div class="shell">
-    <div class="card">
-      <div class="header">
-        <div>
-          <h1 class="page-title">Diagnostic Result</h1>
-          <p class="subtitle">EyeNova multimodal assessment generated from the uploaded corneal maps and clinical inputs.</p>
+    <div class="shell">
+        <div class="card" id="resultCard">
+            <div class="header">
+                <div>
+                    <h1 class="page-title">Diagnostic Result</h1>
+                    <p class="subtitle">EyeNova multimodal assessment generated from the uploaded corneal maps and
+                        clinical inputs.</p>
+                </div>
+                <a class="btn" href="/">Reset / New Scan</a>
+            </div>
+            <div class="status" id="statusBadge">Status: {{ status }}</div>
+            <div class="metrics">
+                <div class="metric"><strong>Confidence</strong>
+                    <div>{{ confidence }}%</div>
+                </div>
+                <div class="metric"><strong>Model</strong>
+                    <div>ViT + Clinical Fusion</div>
+                </div>
+            </div>
+            <div class="layout">
+                <div class="heatmap">
+                    <h3 class="section-heading">Grad-CAM Interpretability</h3>
+                    <img src="data:image/png;base64,{{ heatmap_b64 }}" alt="Grad-CAM heatmap" />
+                </div>
+                <div class="card compact-card">
+                    <h3 class="section-heading">Clinical Interpretation</h3>
+                    <p>The overlay highlights regions of the stitched topography view that were most influential in the
+                        model's prediction. A stronger signal in the central and paracentral corneal regions may be
+                        consistent with keratoconic morphology.</p>
+                    <p class="subtitle">This output is intended to support clinician review and should be interpreted
+                        alongside standard clinical examination and tomography findings.</p>
+                </div>
+            </div>
         </div>
-        <a class="btn" href="/">Reset / New Scan</a>
-      </div>
-      <div class="status">Status: {{ status }}</div>
-      <div class="metrics">
-        <div class="metric"><strong>Confidence</strong><div>{{ confidence }}%</div></div>
-        <div class="metric"><strong>Model</strong><div>ViT + Clinical Fusion</div></div>
-      </div>
-      <div class="layout">
-        <div class="heatmap">
-          <h3 class="section-heading">Grad-CAM Interpretability</h3>
-          <img src="data:image/png;base64,{{ heatmap_b64 }}" alt="Grad-CAM heatmap" />
+
+        <!-- Session History Section -->
+        <div class="card" id="historyCard" style="display: none;">
+            <h2 style="margin-top:0">Session History</h2>
+            <div id="historyList"></div>
         </div>
-        <div class="card compact-card">
-          <h3 class="section-heading">Clinical Interpretation</h3>
-          <p>The overlay highlights regions of the stitched topography view that were most influential in the model's prediction. A stronger signal in the central and paracentral corneal regions may be consistent with keratoconic morphology.</p>
-          <p class="subtitle">This output is intended to support clinician review and should be interpreted alongside standard clinical examination and tomography findings.</p>
-        </div>
-      </div>
     </div>
-  </div>
+
+    <script>
+        // Function to save result to session storage
+        function saveResultToHistory() {
+            const status = "{{ status }}";
+            const confidence = "{{ confidence }}";
+            const timestamp = new Date().toLocaleTimeString();
+
+            let history = JSON.parse(sessionStorage.getItem('eyeNovaHistory') || '[]');
+            history.push({
+                status: status,
+                confidence: confidence,
+                timestamp: timestamp
+            });
+            sessionStorage.setItem('eyeNovaHistory', JSON.stringify(history));
+            displayHistory();
+        }
+
+        // Function to display session history
+        function displayHistory() {
+            let history = JSON.parse(sessionStorage.getItem('eyeNovaHistory') || '[]');
+            const historyList = document.getElementById('historyList');
+            const historyCard = document.getElementById('historyCard');
+
+            if (history.length > 1) {
+                historyCard.style.display = 'block';
+                historyList.innerHTML = '';
+
+                // Display all previous results (excluding current)
+                for (let i = 0; i < history.length - 1; i++) {
+                    const result = history[i];
+                    const resultDiv = document.createElement('div');
+                    resultDiv.className = 'history-item';
+                    resultDiv.innerHTML = `
+                        <div class="history-item-content">
+                            <span class="history-time">${result.timestamp}</span>
+                            <span class="history-status ${result.status.includes('Keratoconus') ? 'status-detected' : 'status-normal'}">
+                                ${result.status}
+                            </span>
+                            <span class="history-confidence">${result.confidence}% confidence</span>
+                        </div>
+                    `;
+                    historyList.appendChild(resultDiv);
+                }
+            }
+        }
+
+        // Apply dynamic colors based on status
+        function applyResultColors() {
+            const status = "{{ status }}";
+            const resultCard = document.getElementById('resultCard');
+            const statusBadge = document.getElementById('statusBadge');
+
+            if (status.includes('Keratoconus')) {
+                resultCard.classList.add('result-detected');
+                statusBadge.classList.add('status-detected');
+            } else {
+                resultCard.classList.add('result-normal');
+                statusBadge.classList.add('status-normal');
+            }
+        }
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', function () {
+            saveResultToHistory();
+            applyResultColors();
+        });
+    </script>
 </body>
+
 </html>

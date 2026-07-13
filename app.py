@@ -142,7 +142,7 @@ class EyeNovaApp:
             tabular = tabular.to(DEVICE)
             pixel_values.requires_grad_(True)
 
-            vit_outputs = self.model.vit(pixel_values=pixel_values, output_attentions=True, return_dict=True)
+            vit_outputs = self.model.vit(pixel_values=pixel_values, return_dict=True)
             image_features = vit_outputs.last_hidden_state[:, 0, :]
             tabular_features = self.model.tabular_mlp(tabular)
             fused_features = torch.cat((image_features, tabular_features), dim=1)
@@ -156,13 +156,26 @@ class EyeNovaApp:
             else:
                 label = 'Normal Cornea'
 
-            attention = vit_outputs.attentions[-1]
-            cls_attention = attention[:, :, 0, 1:].mean(dim=1)
-            cls_attention.retain_grad()
-            loss = logits[:, pred_idx].sum()
-            loss.backward(retain_graph=True)
-            guided_grads = torch.abs(cls_attention.grad)
-            patch_importance = guided_grads.mean(dim=1)[0].detach().cpu()
+            if hasattr(vit_outputs, 'attentions') and vit_outputs.attentions:
+                attention = vit_outputs.attentions[-1]
+                cls_attention = attention[:, :, 0, 1:].mean(dim=1)
+                cls_attention.retain_grad()
+                loss = logits[:, pred_idx].sum()
+                loss.backward(retain_graph=True)
+                guided_grads = torch.abs(cls_attention.grad)
+                patch_importance = guided_grads.mean(dim=1)[0].detach().cpu()
+            else:
+                patch_embeddings = vit_outputs.last_hidden_state[:, 1:, :]
+                patch_embeddings.retain_grad()
+                loss = logits[:, pred_idx].sum()
+                loss.backward(retain_graph=True)
+                
+                if patch_embeddings.grad is not None:
+                    patch_grads = torch.abs(patch_embeddings.grad)
+                    patch_importance = patch_grads.mean(dim=2)[0].detach().cpu()
+                else:
+                    patch_importance = vit_outputs.last_hidden_state[0, 1:, :].abs().mean(dim=1).detach().cpu()
+
             patch_importance = patch_importance.reshape(14, 14)
             heatmap = F.interpolate(
                 patch_importance.unsqueeze(0).unsqueeze(0).float(),
