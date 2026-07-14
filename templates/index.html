@@ -4,7 +4,12 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>EyeNova • Clinical AI Decision Support</title>
+    <title>Live Demo • Clinical AI Decision Support</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
 </head>
 
@@ -17,7 +22,7 @@
     </div>
     <div class="shell">
         <div class="hero">
-            <h1>EyeNova</h1>
+            <h1>Live Demo</h1>
             <p>Clinical AI decision support for keratoconus triage, combining multimodal topography and structured
                 ocular parameters into a single diagnostic view.</p>
         </div>
@@ -104,7 +109,9 @@
                             </div>
                         </div>
                     </div>
-                    <button class="btn" type="submit">Run Clinical Assessment</button>
+                    <div class="form-actions">
+                        <button class="btn" type="submit">Run Clinical Assessment</button>
+                    </div>
                 </form>
             </div>
             <div class="card">

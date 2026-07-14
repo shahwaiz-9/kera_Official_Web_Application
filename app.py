@@ -188,24 +188,24 @@ class EyeNovaApp:
                 ).squeeze().numpy()
                 saliency_map = np.clip((saliency_map - saliency_map.min()) / max(saliency_map.max() - saliency_map.min(), 1e-6), 0.0, 1.0)
 
-            # Custom color mapping and masking to isolate high-attention regions on white
-            side_by_side_image = self.generate_side_by_side_visualization(stitched_image, saliency_map, threshold=0.35)
-            
-            buffer = io.BytesIO()
-            side_by_side_image.save(buffer, format='PNG')
-        heatmap_b64 = base64.b64encode(buffer.getvalue()).decode('ascii')
+            # Save original stitched image to base64
+            buffer_orig = io.BytesIO()
+            stitched_image.save(buffer_orig, format='PNG')
+            original_b64 = base64.b64encode(buffer_orig.getvalue()).decode('ascii')
 
-        return label, confidence, heatmap_b64
+            # Generate isolated heatmap panel
+            right_panel_pil = self.generate_isolated_heatmap(stitched_image, saliency_map, threshold=0.35)
+            buffer_heat = io.BytesIO()
+            right_panel_pil.save(buffer_heat, format='PNG')
+            heatmap_b64 = base64.b64encode(buffer_heat.getvalue()).decode('ascii')
 
-    def generate_side_by_side_visualization(self, stitched_image: Image.Image, saliency_map: np.ndarray, threshold: float = 0.35) -> Image.Image:
+        return label, confidence, original_b64, heatmap_b64
+
+    def generate_isolated_heatmap(self, stitched_image: Image.Image, saliency_map: np.ndarray, threshold: float = 0.35) -> Image.Image:
         """
-        Generate a side-by-side comparison image:
-        - Left Panel: Clean, unmodified original stitched input image.
-        - Right Panel: Isolated high-attention heatmap regions rendered on a solid white background.
+        Generate isolated high-attention heatmap regions rendered on a solid white background.
         """
         width, height = stitched_image.size
-        
-        # 1. Prepare Right Panel (White canvas + isolated heatmap)
         right_panel = np.full((height, width, 3), 255, dtype=np.uint8)
         
         # Create mask for high-attention regions (above threshold)
@@ -247,14 +247,7 @@ class EyeNovaApp:
         # Apply the attention mask to copy colored regions onto the white background
         right_panel[attention_mask] = mapped_heatmap[attention_mask]
         
-        # 2. Combine Left and Right Panels
-        combined_image = Image.new('RGB', (width * 2, height))
-        combined_image.paste(stitched_image, (0, 0))
-        
-        right_panel_pil = Image.fromarray(right_panel, mode='RGB')
-        combined_image.paste(right_panel_pil, (width, 0))
-        
-        return combined_image
+        return Image.fromarray(right_panel, mode='RGB')
 
 
 engine = EyeNovaApp()
@@ -294,8 +287,8 @@ def predict():
             'pachy_x': payload['pachy_x'],
             'pachy_y': payload['pachy_y'],
         }
-        status, confidence, heatmap_b64 = engine.infer(payload, image_files)
-        return render_template('result.html', status=status, confidence=f'{confidence:.1f}', heatmap_b64=heatmap_b64)
+        status, confidence, original_b64, heatmap_b64 = engine.infer(payload, image_files)
+        return render_template('result.html', status=status, confidence=f'{confidence:.1f}', original_b64=original_b64, heatmap_b64=heatmap_b64)
     except Exception as exc:
         return render_template_string("<h2>Assessment Error</h2><p>{{ error }}</p><a href='/'>Return</a>", error=str(exc))
 

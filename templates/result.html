@@ -5,6 +5,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>EyeNova • Diagnostic Result</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
 </head>
 
@@ -29,11 +32,31 @@
                 </div>
             </div>
             <div class="layout">
-                <div class="heatmap">
-                    <h3 class="section-heading">Grad-CAM Interpretability</h3>
-                    <img src="data:image/png;base64,{{ heatmap_b64 }}" alt="Grad-CAM heatmap" />
+                <div class="gradcard">
+                    <h3 class="gradcard-title">Model Interpretability (Grad-CAM)</h3>
+                    <p class="gradcard-subtitle">Visual explanation highlighting key regions of interest that drove the neural network's assessment.</p>
+                    <div class="maps-grid">
+                        <div class="map-panel">
+                            <div class="map-header">
+                                <span class="map-dot dot-original"></span>
+                                <span class="map-label">Original Topography Map</span>
+                            </div>
+                            <div class="map-img-container">
+                                <img src="data:image/png;base64,{{ original_b64 }}" alt="Original Topography Map" />
+                            </div>
+                        </div>
+                        <div class="map-panel">
+                            <div class="map-header">
+                                <span class="map-dot dot-gradcam"></span>
+                                <span class="map-label">High-Attention Regions</span>
+                            </div>
+                            <div class="map-img-container">
+                                <img src="data:image/png;base64,{{ heatmap_b64 }}" alt="Grad-CAM Hotspots" />
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="card compact-card">
+                <div class="card compact-card interpretation-card">
                     <h3 class="section-heading">Clinical Interpretation</h3>
                     <p>The side-by-side comparison displays the original stitched topography view on the left, and isolated high-attention regions (activations above threshold) on a solid white background on the right. This highlights the specific regions that were most influential in the model's prediction.</p>
                     <p class="subtitle">This output is intended to support clinician review and should be interpreted
