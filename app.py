@@ -90,7 +90,8 @@ class EyeNovaApp:
         image = ImageOps.exif_transpose(image)
         return np.array(image)
 
-    def preprocess_images(self, image_files: List[object]) -> torch.Tensor:
+    def preprocess_images(self, image_files: List[object]) -> Tuple[torch.Tensor, Image.Image]:
+        """Preprocess images and return both tensor and the stitched PIL image for visualization."""
         target_size = (112, 112)
         images = []
         for item in image_files:
@@ -105,7 +106,7 @@ class EyeNovaApp:
         canvas.paste(images[3], (112, 112))
 
         processed = self.image_processor(images=canvas, return_tensors='pt')
-        return processed['pixel_values']
+        return processed['pixel_values'], canvas
 
     def preprocess_tabular(self, payload: dict) -> torch.Tensor:
         gender_value = payload.get('gender', '0')
@@ -134,8 +135,9 @@ class EyeNovaApp:
         return torch.tensor(scaled, dtype=torch.float32)
 
     def infer(self, payload: dict, image_files: List[object]) -> Tuple[str, float, str]:
+        """Run inference and return diagnosis, confidence, and Grad-CAM overlaid on actual topography."""
         self.load_artifacts()
-        pixel_values = self.preprocess_images(image_files)
+        pixel_values, stitched_image = self.preprocess_images(image_files)
         tabular = self.preprocess_tabular(payload)
         with torch.set_grad_enabled(True):
             pixel_values = pixel_values.to(DEVICE)
@@ -156,14 +158,15 @@ class EyeNovaApp:
             else:
                 label = 'Normal Cornea'
 
-            if hasattr(vit_outputs, 'attentions') and vit_outputs.attentions:
-                attention = vit_outputs.attentions[-1]
-                cls_attention = attention[:, :, 0, 1:].mean(dim=1)
-                cls_attention.retain_grad()
-                loss = logits[:, pred_idx].sum()
-                loss.backward(retain_graph=True)
-                guided_grads = torch.abs(cls_attention.grad)
-                patch_importance = guided_grads.mean(dim=1)[0].detach().cpu()
+            loss = logits[:, pred_idx].sum()
+            loss.backward(retain_graph=True)
+            
+            pixel_grads = torch.abs(pixel_values.grad)[0]
+            
+            if pixel_grads is not None and pixel_grads.numel() > 0:
+                pixel_grads = pixel_grads.detach().cpu()
+                saliency_map = pixel_grads.mean(dim=0).numpy()
+                saliency_map = np.clip((saliency_map - saliency_map.min()) / max(saliency_map.max() - saliency_map.min(), 1e-6), 0.0, 1.0)
             else:
                 patch_embeddings = vit_outputs.last_hidden_state[:, 1:, :]
                 patch_embeddings.retain_grad()
@@ -175,25 +178,83 @@ class EyeNovaApp:
                     patch_importance = patch_grads.mean(dim=2)[0].detach().cpu()
                 else:
                     patch_importance = vit_outputs.last_hidden_state[0, 1:, :].abs().mean(dim=1).detach().cpu()
+                
+                patch_importance = patch_importance.reshape(14, 14)
+                saliency_map = F.interpolate(
+                    patch_importance.unsqueeze(0).unsqueeze(0).float(),
+                    size=(224, 224),
+                    mode='bilinear',
+                    align_corners=False,
+                ).squeeze().numpy()
+                saliency_map = np.clip((saliency_map - saliency_map.min()) / max(saliency_map.max() - saliency_map.min(), 1e-6), 0.0, 1.0)
 
-            patch_importance = patch_importance.reshape(14, 14)
-            heatmap = F.interpolate(
-                patch_importance.unsqueeze(0).unsqueeze(0).float(),
-                size=(224, 224),
-                mode='bilinear',
-                align_corners=False,
-            ).squeeze().numpy()
-            heatmap = np.clip((heatmap - heatmap.min()) / max(heatmap.max() - heatmap.min(), 1e-6), 0.0, 1.0)
-            heatmap = (heatmap * 255).astype(np.uint8)
-            overlay = Image.fromarray(heatmap, mode='L').resize((224, 224))
-            base = Image.new('RGB', (224, 224), color=(255, 255, 255))
-            color_overlay = Image.merge('RGB', (overlay, Image.new('L', overlay.size, 0), Image.new('L', overlay.size, 0)))
-            base = Image.blend(base, color_overlay, alpha=0.35)
+            # Custom color mapping and masking to isolate high-attention regions on white
+            side_by_side_image = self.generate_side_by_side_visualization(stitched_image, saliency_map, threshold=0.35)
+            
             buffer = io.BytesIO()
-            base.save(buffer, format='PNG')
+            side_by_side_image.save(buffer, format='PNG')
         heatmap_b64 = base64.b64encode(buffer.getvalue()).decode('ascii')
 
         return label, confidence, heatmap_b64
+
+    def generate_side_by_side_visualization(self, stitched_image: Image.Image, saliency_map: np.ndarray, threshold: float = 0.35) -> Image.Image:
+        """
+        Generate a side-by-side comparison image:
+        - Left Panel: Clean, unmodified original stitched input image.
+        - Right Panel: Isolated high-attention heatmap regions rendered on a solid white background.
+        """
+        width, height = stitched_image.size
+        
+        # 1. Prepare Right Panel (White canvas + isolated heatmap)
+        right_panel = np.full((height, width, 3), 255, dtype=np.uint8)
+        
+        # Create mask for high-attention regions (above threshold)
+        attention_mask = saliency_map >= threshold
+        
+        # Implement a vibrant Jet colormap manually using vectorized NumPy
+        v = saliency_map
+        r = np.zeros_like(v)
+        g = np.zeros_like(v)
+        b = np.zeros_like(v)
+        
+        # v < 0.25
+        m1 = v < 0.25
+        b[m1] = 0.5 + 2.0 * v[m1]
+        g[m1] = 4.0 * v[m1]
+        
+        # 0.25 <= v < 0.5
+        m2 = (v >= 0.25) & (v < 0.5)
+        g[m2] = 1.0
+        b[m2] = 1.0 - 4.0 * (v[m2] - 0.25)
+        
+        # 0.5 <= v < 0.75
+        m3 = (v >= 0.5) & (v < 0.75)
+        r[m3] = 4.0 * (v[m3] - 0.5)
+        g[m3] = 1.0
+        
+        # v >= 0.75
+        m4 = v >= 0.75
+        r[m4] = 1.0
+        g[m4] = 1.0 - 4.0 * (v[m4] - 0.75)
+        
+        # Clip values to [0, 1] range and scale to [0, 255]
+        r_img = (np.clip(r, 0.0, 1.0) * 255.0).astype(np.uint8)
+        g_img = (np.clip(g, 0.0, 1.0) * 255.0).astype(np.uint8)
+        b_img = (np.clip(b, 0.0, 1.0) * 255.0).astype(np.uint8)
+        
+        mapped_heatmap = np.stack([r_img, g_img, b_img], axis=-1)
+        
+        # Apply the attention mask to copy colored regions onto the white background
+        right_panel[attention_mask] = mapped_heatmap[attention_mask]
+        
+        # 2. Combine Left and Right Panels
+        combined_image = Image.new('RGB', (width * 2, height))
+        combined_image.paste(stitched_image, (0, 0))
+        
+        right_panel_pil = Image.fromarray(right_panel, mode='RGB')
+        combined_image.paste(right_panel_pil, (width, 0))
+        
+        return combined_image
 
 
 engine = EyeNovaApp()
